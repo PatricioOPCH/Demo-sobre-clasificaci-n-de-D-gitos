@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/styles.css') }}">
+    <title>Escribe y Dibuja</title>
+</head>
+<body>
+    <h1>Clasificador de números de un digito</h1>
+    <h3>Intrucciones: Dibuje en el espacio designado con el raton y seleccione enviar para obtener el número en que fue clasificado por un modelo</h3>
+    <div id="message-display"></div>
+    <div id="canvas-container">
+        <canvas id="canvas" width="400" height="300"></canvas>
+        <button id="clear-button">Borrar Dibujo</button>
+    </div>
+    <form method="POST" action="/predict" enctype="multipart/form-data">
+        <button type="submit" name="submit">Enviar</button>
+    </form>
+    <script>
+        const form = document.querySelector('form');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Variables para el dibujo
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let lineWidth = 20;
+
+        // Función para dibujar en el canvas
+        function draw(e) {
+            if (!isDrawing) return;
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(e.offsetX, e.offsetY);
+            ctx.lineWidth = lineWidth;
+            ctx.strokeStyle = '#fff'; 
+            ctx.stroke();
+            lastX = e.offsetX;
+            lastY = e.offsetY;
+        }
+
+        // Eventos del mouse para dibujar en el canvas
+        canvas.addEventListener('mousedown', (e) => {
+            isDrawing = true;
+            lastX = e.offsetX;
+            lastY = e.offsetY;
+        });
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', () => isDrawing = false);
+        canvas.addEventListener('mouseout', () => isDrawing = false);
+
+        // Evento para borrar el canvas
+        const clearButton = document.getElementById('clear-button');
+        clearButton.addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        });
+
+       
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Crear un nuevo canvas con fondo blanco
+            const newCanvas = document.createElement('canvas');
+            newCanvas.width = canvas.width;
+            newCanvas.height = canvas.height;
+            const newCtx = newCanvas.getContext('2d');
+            newCtx.fillStyle = '#000000';
+            newCtx.fillRect(0, 0, newCanvas.width, newCanvas.height);
+
+            // Dibujar la imagen del canvas de dibujo en el nuevo canvas
+            newCtx.drawImage(canvas, 0, 0);
+
+            // Obtener la imagen resultante como una cadena base64
+            const image_data = newCanvas.toDataURL('image/png');
+
+            const response = await fetch('/update', {
+                method: 'POST',
+                body: new URLSearchParams({ image_data }),
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+            });
+
+            if (response.ok) {
+                const prediction = await response.json();
+                alert(`La predicción es: ${prediction}`);
+            } else {
+                alert('Error en la respuesta del servidor');
+            }
+        });
+    </script>
+</body>
+</html>
